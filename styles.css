@@ -4,9 +4,9 @@
   --ground: #0a0b14;
   --ground-lift: #161a2c;
   --edge: #2c3150;
-  --pluck: #4fd1c5;
+  --drum: #f4785f;
   --bell: #f0a5d8;
-  --noise: #f6c96b;
+  --noise: #4fd1c5;
   --glide: #8b9cff;
 
   color-scheme: dark;
@@ -69,12 +69,15 @@ main {
   top: 50%;
   left: 50%;
   z-index: 0;
-  width: min(120vw, 46rem);
+
+  /* Sized so that even at full swell (scale 1.2) it stays inside the viewport:
+     78vw * 1.2 is still under 100vw. Cheaper than clipping it. */
+  width: min(78vw, 40rem);
   aspect-ratio: 1;
-  background: radial-gradient(circle, rgb(110 130 255 / 22%) 0%, rgb(10 11 20 / 0%) 68%);
+  background: radial-gradient(circle, rgb(126 146 255 / 42%) 0%, rgb(10 11 20 / 0%) 66%);
   border-radius: 50%;
-  opacity: calc(0.35 + var(--breath, 0) * 0.65);
-  transform: translate(-50%, -50%) scale(calc(0.92 + var(--breath, 0) * 0.16));
+  opacity: calc(0.18 + var(--breath, 0) * 0.82);
+  transform: translate(-50%, -50%) scale(calc(0.78 + var(--breath, 0) * 0.42));
   pointer-events: none;
 }
 
@@ -116,6 +119,11 @@ kbd {
   grid-template-columns: repeat(4, 1fr);
   gap: 0.9rem;
   width: 100%;
+
+  /* The whole rack lifts a little on each beat, so the rhythm is visible at
+     the pads and not only behind them. Pulses *up to* its natural size rather
+     than past it — growing outward clipped the outer pads at 390px. */
+  transform: scale(calc(0.986 + var(--breath, 0) * 0.014));
 }
 
 .pad {
@@ -140,14 +148,18 @@ kbd {
   font: inherit;
   cursor: pointer;
 
+  /* Each pad glows on the beat, in its own colour. */
+  box-shadow: 0 0 calc(var(--breath, 0) * 1.6rem)
+    color-mix(in srgb, var(--hue, #8b9cff) calc(var(--breath, 0) * 22%), transparent);
+
   /* Stops the browser scrolling or zooming instead of tracking a drag. */
   touch-action: none;
-  transition: border-color 120ms ease, box-shadow 160ms ease;
+  transition: border-color 120ms ease;
   user-select: none;
 }
 
-.pad[data-voice="pluck"] {
-  --hue: var(--pluck);
+.pad[data-voice="drum"] {
+  --hue: var(--drum);
 }
 
 .pad[data-voice="bell"] {
@@ -201,11 +213,22 @@ kbd {
   pointer-events: none;
 }
 
-.pad-key {
+.pad-icon {
+  width: clamp(2.2rem, 6vw, 3.2rem);
+  height: clamp(2.2rem, 6vw, 3.2rem);
   color: var(--hue);
-  font-size: clamp(1.6rem, 5vw, 2.4rem);
+}
+
+/* The key letter still has to be findable, but the picture leads now. */
+.pad-badge {
+  position: absolute;
+  top: 0.55rem;
+  left: 0.7rem;
+  color: var(--hue);
+  font-size: 1rem;
   font-weight: 800;
   line-height: 1;
+  opacity: 0.8;
 }
 
 .pad-name {
@@ -273,12 +296,15 @@ kbd {
 }
 
 .beat-dot {
-  width: 0.5rem;
-  height: 0.5rem;
+  width: 0.7rem;
+  height: 0.7rem;
   margin-right: 0.4rem;
   background: var(--glide);
   border-radius: 50%;
-  opacity: 0.25;
+
+  /* Throbs continuously with the beat phase, on top of the per-beat flash. */
+  opacity: calc(0.18 + var(--breath, 0) * 0.82);
+  transform: scale(calc(0.8 + var(--breath, 0) * 0.5));
 }
 
 .status {
@@ -308,6 +334,15 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   .glow {
     opacity: 0.4;
+    transform: translate(-50%, -50%);
+  }
+
+  .pads,
+  .beat-dot {
     transform: none;
+  }
+
+  .pad {
+    box-shadow: none;
   }
 }

@@ -3,8 +3,9 @@
 ## What I built
 
 **Four Pads** — four voices that differ by construction, not by retuning one
-oscillator: a filtered triangle pluck, an FM bell on an inharmonic ratio, a
-resonant bandpass on noise, and a detuned sawtooth that sustains and glides.
+oscillator: a swept-sine drum with a noise beater, an FM bell on an inharmonic
+ratio, a resonant bandpass on noise, and a detuned sawtooth that sustains and
+glides. Each pad carries a drawing of its instrument.
 Where you touch a pad sets its pitch, so a tap is expressive before anyone
 discovers dragging. The percussive three snap to a pentatonic ladder, which has
 no semitone pairs — so no combination can clash and someone who reads no music
@@ -28,7 +29,7 @@ loop sit underneath.
    (throws in a browser), a ramp *away* from zero (silent, throws nothing), a
    NaN reaching an AudioParam, and a node started twice. Then I swept every
    voice across every gesture through it. Proof it wasn't decorative — deleting
-   one line so the pluck's gain ramped from zero turned five tests red naming
+   one line so the drum's gain ramped from zero turned five tests red naming
    the fault, green again restored
    ([`6783b76`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit4-xuwancheng62-lab/commit/6783b76)).
    That failure makes no sound and logs no error.

@@ -5,7 +5,7 @@ export type PadId = "a" | "s" | "d" | "f";
 
 export const PAD_IDS: readonly PadId[] = ["a", "s", "d", "f"];
 
-export type VoiceKind = "pluck" | "bell" | "noise" | "glide";
+export type VoiceKind = "drum" | "bell" | "noise" | "glide";
 
 export interface PadSpec {
   id: PadId;
@@ -23,8 +23,10 @@ export interface PadSpec {
 // combination of pads is consonant: pentatonic has no semitone pairs, so
 // there is no two-pad clash to stumble into. That is most of what makes this
 // playable by someone who does not read music.
+// The drum sits two octaves below the others: same pentatonic root, but down
+// where a struck skin lives rather than up with the melodic voices.
 export const PADS: Record<PadId, PadSpec> = {
-  a: { id: "a", key: "a", label: "Pluck", voice: "pluck", rootMidi: 60, sustained: false },
+  a: { id: "a", key: "a", label: "Drum", voice: "drum", rootMidi: 36, sustained: false },
   s: { id: "s", key: "s", label: "Bell", voice: "bell", rootMidi: 62, sustained: false },
   d: { id: "d", key: "d", label: "Clack", voice: "noise", rootMidi: 64, sustained: false },
   f: { id: "f", key: "f", label: "Glide", voice: "glide", rootMidi: 67, sustained: true },

@@ -15,7 +15,7 @@ scale, so the expressive gesture cannot land out of tune either.
 The second half was the checks. I cannot verify a synth by listening once, so I
 made the fake AudioContext my tests run against reject the Web Audio mistakes
 that are silent — a gain ramping exponentially from zero produces nothing at all
-and throws no error. Then I broke my own pluck envelope on purpose to confirm
+and throws no error. Then I broke my own drum envelope on purpose to confirm
 the check would actually catch it. Five tests went red naming the fault.
 
 ## What did this work change about who I want to be as a software developer?

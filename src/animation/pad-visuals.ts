@@ -1,5 +1,5 @@
 // Each pad looks like it sounds. The transient hit is a one-shot Web Animation
-// (a ripple for the pluck, a slow bloom for the bell, a hard jitter for the
+// (a hard punch for the drum, a slow bloom for the bell, a jitter for the
 // clack); anything continuous is a CSS custom property the stylesheet reads, so
 // a glide's pitch can be reflected without animating from script every frame.
 
@@ -16,16 +16,25 @@ const PITCH_RANGE = 12;
 type Flash = (pad: HTMLElement, ink: HTMLElement | null) => void;
 
 const FLASHES: Record<VoiceKind, Flash> = {
-  // A single sharp ripple, and the pad gives a little.
-  pluck: (pad, ink) => {
+  // A struck skin: the pad takes the hit hard and springs back, and the ink
+  // punches outward fast rather than rippling.
+  drum: (pad, ink) => {
     pad.animate(
-      [{ transform: "scale(1)" }, { transform: "scale(0.94)" }, { transform: "scale(1)" }],
-      { duration: 300, easing: "cubic-bezier(.2,.85,.25,1)" },
+      [
+        { transform: "scale(1)" },
+        { transform: "scale(0.9)", offset: 0.12 },
+        { transform: "scale(1.02)", offset: 0.5 },
+        { transform: "scale(1)" },
+      ],
+      { duration: 340, easing: "cubic-bezier(.2,.9,.2,1)" },
     );
-    ink?.animate([{ transform: "scale(0.25)", opacity: 0.9 }, { transform: "scale(1.1)", opacity: 0 }], {
-      duration: 430,
-      easing: "cubic-bezier(.15,.7,.2,1)",
-    });
+    ink?.animate(
+      [
+        { transform: "scale(0.15)", opacity: 1 },
+        { transform: "scale(0.95)", opacity: 0 },
+      ],
+      { duration: 300, easing: "cubic-bezier(.1,.8,.2,1)" },
+    );
   },
   // Slower, wider, and it lingers — a struck bell rings on.
   bell: (pad, ink) => {

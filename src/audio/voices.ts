@@ -57,54 +57,70 @@ function rampThrough(
   }
 }
 
-// ---------------------------------------------------------------- pluck (A)
+// ----------------------------------------------------------------- drum (A)
 
-function pluckCutoff(freq: number, brightness: number): number {
-  return Math.max(freq * 1.5, 700 + brightness * 5200);
+function beaterCutoff(brightness: number): number {
+  return 1300 + brightness * 2700;
 }
 
-function createPluckVoice(env: VoiceEnvironment, root: number): PadVoice {
-  const { ctx, out } = env;
-  let live: { filter: BiquadFilterNode } | null = null;
+function createDrumVoice(env: VoiceEnvironment, root: number): PadVoice {
+  const { ctx, out, noiseBuffer } = env;
+  let live: { beater: BiquadFilterNode } | null = null;
 
   function spawn(time: number, params: VoiceParams, gesture: Gesture | null) {
     const freq = semitonesToFrequency(root, params.semitones);
-    const osc = ctx.createOscillator();
-    osc.type = "triangle";
-    osc.frequency.setValueAtTime(freq, time);
 
-    const filter = ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.Q.value = 5;
-    const peak = pluckCutoff(freq, params.brightness);
-    filter.frequency.setValueAtTime(peak, time);
-    if (gesture) {
-      rampThrough(filter.frequency, time, gesture, (p) => pluckCutoff(freq, p.brightness));
-    }
-    filter.frequency.exponentialRampToValueAtTime(Math.max(200, freq * 1.4), time + 0.4);
+    // The body: a sine swept steeply down from several times its target. That
+    // sweep is the whole trick — it is what the ear hears as a skin being
+    // struck rather than a tone being switched on.
+    const body = ctx.createOscillator();
+    body.type = "sine";
+    body.frequency.setValueAtTime(freq * 4.5, time);
+    body.frequency.exponentialRampToValueAtTime(freq, time + 0.06);
 
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0, time);
-    gain.gain.linearRampToValueAtTime(0.5, time + 0.006);
-    gain.gain.exponentialRampToValueAtTime(SILENCE, time + 0.45);
+    const decay = 0.3 + params.brightness * 0.32;
+    const bodyGain = ctx.createGain();
+    bodyGain.gain.setValueAtTime(0, time);
+    bodyGain.gain.linearRampToValueAtTime(0.85, time + 0.004);
+    bodyGain.gain.exponentialRampToValueAtTime(SILENCE, time + decay);
 
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(out);
-    osc.start(time);
-    osc.stop(time + 0.5);
-    return { filter };
+    body.connect(bodyGain);
+    bodyGain.connect(out);
+    body.start(time);
+    body.stop(time + decay + 0.05);
+
+    // The beater: a very short band of noise on top. Without it the drum is a
+    // soft boom with no attack, and it stops cutting through a busy loop.
+    const beat = ctx.createBufferSource();
+    beat.buffer = noiseBuffer;
+    const beater = ctx.createBiquadFilter();
+    beater.type = "bandpass";
+    beater.Q.value = 1.1;
+    beater.frequency.setValueAtTime(beaterCutoff(params.brightness), time);
+    if (gesture) rampThrough(beater.frequency, time, gesture, (p) => beaterCutoff(p.brightness));
+
+    const beaterGain = ctx.createGain();
+    beaterGain.gain.setValueAtTime(0, time);
+    beaterGain.gain.linearRampToValueAtTime(0.32, time + 0.002);
+    beaterGain.gain.exponentialRampToValueAtTime(SILENCE, time + 0.05);
+
+    beat.connect(beater);
+    beater.connect(beaterGain);
+    beaterGain.connect(out);
+    beat.start(time);
+    beat.stop(time + 0.07);
+
+    return { beater };
   }
 
   return {
     press(time, params) {
       live = spawn(time, params, null);
     },
-    // Pitch is fixed at the press: bending a plucked string mid-decay sounds
-    // like a mistake, where opening the filter sounds like playing it.
+    // A drum's pitch is set the instant it is struck; there is nothing left to
+    // bend. The beater's colour is all a drag can still reach.
     moveTo(time, params) {
-      const freq = semitonesToFrequency(root, params.semitones);
-      live?.filter.frequency.setTargetAtTime(pluckCutoff(freq, params.brightness), time, 0.04);
+      live?.beater.frequency.setTargetAtTime(beaterCutoff(params.brightness), time, 0.02);
     },
     release() {
       live = null;
@@ -206,8 +222,8 @@ function createNoiseVoice(env: VoiceEnvironment, root: number): PadVoice {
 
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0, time);
-    gain.gain.linearRampToValueAtTime(0.4, time + 0.003);
-    gain.gain.exponentialRampToValueAtTime(SILENCE, time + 0.28);
+    gain.gain.linearRampToValueAtTime(0.72, time + 0.003);
+    gain.gain.exponentialRampToValueAtTime(SILENCE, time + 0.3);
 
     source.connect(filter);
     filter.connect(gain);
@@ -327,7 +343,7 @@ function createGlideVoice(env: VoiceEnvironment, root: number): PadVoice {
 }
 
 const BUILDERS: Record<VoiceKind, (env: VoiceEnvironment, root: number) => PadVoice> = {
-  pluck: createPluckVoice,
+  drum: createDrumVoice,
   bell: createBellVoice,
   noise: createNoiseVoice,
   glide: createGlideVoice,

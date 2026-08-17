@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 // actually ships.
 const DIST = resolve("dist");
 const PADS = [
-  { id: "a", key: "A", name: "Pluck" },
+  { id: "a", key: "A", name: "Drum" },
   { id: "s", key: "S", name: "Bell" },
   { id: "d", key: "D", name: "Clack" },
   { id: "f", key: "F", name: "Glide" },
@@ -111,6 +111,14 @@ describe("playable with whatever is at hand", () => {
 
       it("declares which voice it is, for the audio layer to build", () => {
         expect(element?.getAttribute("data-voice")).toBeTruthy();
+      });
+
+      it("shows a picture of the instrument, hidden from screen readers", () => {
+        // The name is already the accessible label, so the icon must not be
+        // announced a second time.
+        const icon = element?.querySelector("svg.pad-icon");
+        expect(icon).toBeTruthy();
+        expect(icon?.getAttribute("aria-hidden")).toBe("true");
       });
     });
   }
