@@ -3,22 +3,92 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>COMP4020 prototype</title>
+    <title>Four Pads — an instrument for the browser</title>
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
     <header>
       <nav aria-label="Primary">
-        <a href="./">Home</a>
+        <a href="./">Four Pads</a>
       </nav>
     </header>
-    <main>
-      <h1>COMP4020 prototype</h1>
-      <p data-testid="intro">
-        Replace this with your prototype. This week's brief is on the course website;
-        <code>spec/README.md</code> explains how the checks in this repo relate to it.
+
+    <main data-testid="stage">
+      <div class="glow" data-testid="breath" aria-hidden="true"></div>
+
+      <h1>Four Pads</h1>
+      <p class="invite" data-testid="invite">
+        Touch a pad, or press <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd>. Higher up
+        the pad is a higher note.
+      </p>
+
+      <div class="pads" role="group" aria-label="Instrument pads">
+        <button
+          type="button"
+          class="pad"
+          data-pad="a"
+          data-voice="pluck"
+          data-testid="pad-a"
+        >
+          <span class="pad-ink" data-ink aria-hidden="true"></span>
+          <span class="pad-key" aria-hidden="true">A</span>
+          <span class="pad-name">Pluck</span>
+        </button>
+
+        <button
+          type="button"
+          class="pad"
+          data-pad="s"
+          data-voice="bell"
+          data-testid="pad-s"
+        >
+          <span class="pad-ink" data-ink aria-hidden="true"></span>
+          <span class="pad-key" aria-hidden="true">S</span>
+          <span class="pad-name">Bell</span>
+        </button>
+
+        <button
+          type="button"
+          class="pad"
+          data-pad="d"
+          data-voice="noise"
+          data-testid="pad-d"
+        >
+          <span class="pad-ink" data-ink aria-hidden="true"></span>
+          <span class="pad-key" aria-hidden="true">D</span>
+          <span class="pad-name">Clack</span>
+        </button>
+
+        <button
+          type="button"
+          class="pad"
+          data-pad="f"
+          data-voice="glide"
+          data-testid="pad-f"
+        >
+          <span class="pad-ink" data-ink aria-hidden="true"></span>
+          <span class="pad-key" aria-hidden="true">F</span>
+          <span class="pad-name">Glide</span>
+          <span class="pad-hint">hold &amp; slide</span>
+        </button>
+      </div>
+
+      <div class="controls">
+        <button type="button" class="control" data-testid="beat-toggle" aria-pressed="true">
+          Beat on
+        </button>
+        <span class="beat-dot" data-testid="beat-dot" aria-hidden="true"></span>
+        <button type="button" class="control control-loop" data-testid="loop-advance">
+          Record
+        </button>
+        <button type="button" class="control" data-testid="loop-clear" disabled>Clear</button>
+      </div>
+
+      <p class="status" data-testid="loop-status" role="status" aria-live="polite">
+        Press Record when you want to keep a phrase.
       </p>
     </main>
+
     <script type="module" src="./main.ts"></script>
   </body>
 </html>
