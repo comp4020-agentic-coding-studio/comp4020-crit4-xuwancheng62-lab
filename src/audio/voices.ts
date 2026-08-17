@@ -211,18 +211,31 @@ function createBellVoice(env: VoiceEnvironment, root: number): PadVoice {
 //            ramp at all. This is what the ear uses to place the hit in time,
 //            and it is the whole of "immediate".
 
+/** Where the body's band stops. A highpass alone passes everything up to
+ * Nyquist, which is why lowering its corner made the clack fuller without
+ * making it any less fizzy — the hiss lives above 6kHz and a highpass never
+ * touches it. Bounding the top is what removes sizzle. */
+function clackTop(brightness: number): number {
+  return 3400 + brightness * 1700;
+}
+
 /** Always in the treble, and rising with pitch — never muddy at the bottom. */
 function clackRing(freq: number, brightness: number): number {
-  return Math.min(11000, 2000 + freq * 4.5 + brightness * 900);
+  return Math.min(7000, 1250 + freq * 3.2 + brightness * 650);
 }
 
 function clackBody(brightness: number): number {
-  return 2400 + brightness * 3200;
+  return 1100 + brightness * 1500;
 }
 
 function createNoiseVoice(env: VoiceEnvironment, root: number): PadVoice {
   const { ctx, out, noiseBuffer } = env;
-  let live: { body: BiquadFilterNode; ring: BiquadFilterNode; freq: number } | null = null;
+  let live: {
+    body: BiquadFilterNode;
+    top: BiquadFilterNode;
+    ring: BiquadFilterNode;
+    freq: number;
+  } | null = null;
 
   function spawn(time: number, params: VoiceParams, gesture: Gesture | null) {
     const freq = semitonesToFrequency(root, params.semitones);
@@ -238,11 +251,20 @@ function createNoiseVoice(env: VoiceEnvironment, root: number): PadVoice {
     const corner = clackBody(params.brightness);
     body.frequency.setValueAtTime(corner, time);
     if (gesture) rampThrough(body.frequency, time, gesture, (p) => clackBody(p.brightness));
-    body.frequency.exponentialRampToValueAtTime(Math.min(14000, corner * 1.7), time + 0.1);
+    body.frequency.exponentialRampToValueAtTime(Math.min(6000, corner * 1.25), time + 0.1);
+
+    // Highpass and lowpass in series: a wide band, so it keeps the energy a
+    // narrow one would throw away, but with a ceiling so it reads as wood
+    // rather than hiss.
+    const top = ctx.createBiquadFilter();
+    top.type = "lowpass";
+    top.Q.value = 0.7;
+    top.frequency.setValueAtTime(clackTop(params.brightness), time);
+    if (gesture) rampThrough(top.frequency, time, gesture, (p) => clackTop(p.brightness));
 
     const bodyGain = ctx.createGain();
     bodyGain.gain.setValueAtTime(0, time);
-    bodyGain.gain.linearRampToValueAtTime(0.62, time + 0.0012);
+    bodyGain.gain.linearRampToValueAtTime(0.8, time + 0.0012);
     // Ramping to a near-zero floor sounds like it should give an 85ms decay and
     // does not: an exponential to 0.0001 has already fallen below hearing in a
     // quarter of that, which is why the first attempt measured 26ms and read as
@@ -252,7 +274,8 @@ function createNoiseVoice(env: VoiceEnvironment, root: number): PadVoice {
     bodyGain.gain.linearRampToValueAtTime(0, time + 0.18);
 
     bodySource.connect(body);
-    body.connect(bodyGain);
+    body.connect(top);
+    top.connect(bodyGain);
     bodyGain.connect(out);
     bodySource.start(time);
     bodySource.stop(time + 0.2);
@@ -264,13 +287,13 @@ function createNoiseVoice(env: VoiceEnvironment, root: number): PadVoice {
 
     const ring = ctx.createBiquadFilter();
     ring.type = "bandpass";
-    ring.Q.value = 8;
+    ring.Q.value = 5;
     ring.frequency.setValueAtTime(clackRing(freq, params.brightness), time);
     if (gesture) rampThrough(ring.frequency, time, gesture, (p) => clackRing(freq, p.brightness));
 
     const ringGain = ctx.createGain();
     ringGain.gain.setValueAtTime(0, time);
-    ringGain.gain.linearRampToValueAtTime(0.58, time + 0.001);
+    ringGain.gain.linearRampToValueAtTime(0.78, time + 0.001);
     // Outlasts the body a little: the pitched part is what stops a bright hit
     // sounding like a burst of static.
     ringGain.gain.exponentialRampToValueAtTime(0.012, time + 0.24);
@@ -286,19 +309,25 @@ function createNoiseVoice(env: VoiceEnvironment, root: number): PadVoice {
     const tickSource = ctx.createBufferSource();
     tickSource.buffer = noiseBuffer;
 
+    const tickTone = ctx.createBiquadFilter();
+    tickTone.type = "lowpass";
+    tickTone.Q.value = 0.7;
+    tickTone.frequency.setValueAtTime(5000, time);
+
     const tickGain = ctx.createGain();
     // Straight in at full level: an attack ramp, even a millisecond of one,
     // is what made the old version feel soft.
-    tickGain.gain.setValueAtTime(0.34, time);
+    tickGain.gain.setValueAtTime(0.42, time);
     tickGain.gain.exponentialRampToValueAtTime(0.01, time + 0.016);
     tickGain.gain.linearRampToValueAtTime(0, time + 0.022);
 
-    tickSource.connect(tickGain);
+    tickSource.connect(tickTone);
+    tickTone.connect(tickGain);
     tickGain.connect(out);
     tickSource.start(time);
     tickSource.stop(time + 0.03);
 
-    return { body, ring, freq };
+    return { body, top, ring, freq };
   }
 
   return {
@@ -308,6 +337,7 @@ function createNoiseVoice(env: VoiceEnvironment, root: number): PadVoice {
     moveTo(time, params) {
       if (!live) return;
       live.body.frequency.setTargetAtTime(clackBody(params.brightness), time, 0.02);
+      live.top.frequency.setTargetAtTime(clackTop(params.brightness), time, 0.02);
       live.ring.frequency.setTargetAtTime(clackRing(live.freq, params.brightness), time, 0.02);
     },
     release() {

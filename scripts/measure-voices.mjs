@@ -14,7 +14,10 @@
 //   pnpm measure             # in another
 //
 // Columns:
-//   peak      loudest sample. Over ~1.0 and it would clip without the limiter.
+//   peak      loudest sample, measured at the voice's own output. The pad bus
+//             attenuates by PAD_LEVEL before the limiter, so the number that
+//             matters is peak * PAD_LEVEL < 1. Noise voices vary run to run,
+//             so leave margin rather than tuning to the edge.
 //   rms       average energy: the best single proxy for how loud it *feels*,
 //             though treble reads louder than bass at equal rms.
 //   hi>2kHz   fraction of energy above 2kHz. This is "brightness".
@@ -144,8 +147,15 @@ const IN_PAGE = `(async () => {
     };
   }
 
+  // Three heights on the pad, because the drag changes the timbre and a
+  // problem can hide at one end of it — the clack turned out fizzy only once
+  // its band reached far enough up.
   const rows = [];
-  for (const padId of pads.PAD_IDS) rows.push(await render(padId, 0.5));
+  for (const padId of pads.PAD_IDS) {
+    for (const brightness of [0.1, 0.5, 0.9]) {
+      rows.push({ ...(await render(padId, brightness)), brightness });
+    }
+  }
   return JSON.stringify(rows);
 })()`;
 
@@ -192,19 +202,28 @@ const pad = (text, width) => String(text).padEnd(width);
 const num = (value, digits, width) => String(value.toFixed(digits)).padStart(width);
 
 console.log("");
-console.log(`  ${pad("pad", 8)}${pad("peak", 8)}${pad("rms", 9)}${pad("hi>2kHz", 10)}${pad("zcr", 9)}${pad("attack", 9)}decay`);
-console.log(`  ${"-".repeat(60)}`);
+console.log(`  ${pad("pad", 8)}${pad("drag", 7)}${pad("peak", 8)}${pad("rms", 9)}${pad("hi>2kHz", 10)}${pad("zcr", 9)}${pad("attack", 9)}decay`);
+console.log(`  ${"-".repeat(67)}`);
+let previousPad = null;
 for (const row of rows) {
+  if (previousPad && previousPad !== row.pad) console.log("");
+  previousPad = row.pad;
+  const where = row.brightness < 0.3 ? "low" : row.brightness > 0.7 ? "high" : "mid";
   console.log(
-    `  ${pad(row.label, 8)}${num(row.peak, 3, 5)}   ${num(row.rms, 4, 6)}   ${num(row.hi * 100, 1, 6)}%   ${num(row.zcr, 0, 6)}Hz  ${num(row.attackMs, 1, 6)}ms ${num(row.decayMs, 0, 5)}ms`,
+    `  ${pad(row.label, 8)}${pad(where, 7)}${num(row.peak, 3, 5)}   ${num(row.rms, 4, 6)}   ${num(row.hi * 100, 1, 6)}%   ${num(row.zcr, 0, 6)}Hz  ${num(row.attackMs, 1, 6)}ms ${num(row.decayMs, 0, 5)}ms`,
   );
 }
 console.log("");
 
 // The one thing here that is genuinely a fault rather than a matter of taste.
-const clipping = rows.filter((row) => row.peak > 1);
-if (clipping.length > 0) {
-  console.log(`  note: ${clipping.map((r) => r.label).join(", ")} peak above 1.0 —`);
-  console.log("  the master limiter catches it, but there is no headroom left.");
+// Compared against the pad bus, not against 1.0 — measuring the voice in
+// isolation and warning at 1.0 had me tuning levels down for no reason.
+const PAD_LEVEL = 0.85;
+const CEILING = 1 / PAD_LEVEL;
+const hot = [...new Set(rows.filter((row) => row.peak > CEILING).map((row) => row.label))];
+if (hot.length > 0) {
+  console.log(`  note: ${hot.join(", ")} peaks above ${CEILING.toFixed(2)} —`);
+  console.log("  that clips once the pad bus is applied. The limiter will catch it,");
+  console.log("  but nothing above this is headroom you actually have.");
   console.log("");
 }

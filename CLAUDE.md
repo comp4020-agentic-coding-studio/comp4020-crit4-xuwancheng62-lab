@@ -68,6 +68,20 @@ file is the work.
 - **A bandpass is a quiet filter; a highpass is a loud one.** For anything that
   needs to be bright *and* present, highpass the noise and let a separate
   high-Q band supply the pitch. A narrow band alone is always dull and quiet.
+- **A highpass cannot make something less fizzy.** It passes everything up to
+  Nyquist, so lowering its corner adds bottom and removes no hiss whatsoever —
+  I lowered it by half and the measured zero-crossing rate barely moved. Sizzle
+  lives above ~6kHz and needs the top *bounded*: highpass and lowpass in series
+  gives a wide band that is loud without being shrill.
+- **Measure across the drag range, not just the middle.** `pnpm measure` reports
+  low/mid/high because a fault can hide at one end: the clack was fine at the
+  bottom of the pad and both fizzy and over the clipping ceiling at the top.
+- **The peak that matters is `peak * PAD_LEVEL`, not `peak`.** `measure` reads a
+  voice at its own output, before the pad bus attenuates it. Comparing against
+  1.0 there had me trimming levels I did not need to trim.
+- **Noise voices have a stochastic peak.** The buffer is regenerated per run, so
+  the same settings measure anywhere across a wide range. Leave margin instead
+  of tuning to the edge of the ceiling.
 - **`exponentialRampToValueAtTime(0.0001, t + 0.085)` is not an 85ms decay.**
   It falls below hearing in roughly a quarter of that — the first clack measured
   26ms and read as a thin tick. Ramp to about 2% of peak over the length you
