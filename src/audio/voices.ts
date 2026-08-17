@@ -195,42 +195,110 @@ function createBellVoice(env: VoiceEnvironment, root: number): PadVoice {
 
 // ---------------------------------------------------------------- clack (D)
 
+// A clave, in three layers. The first version was a single bandpass, which is
+// why it sat dull and quiet however far I pushed its gain: a Q of 2.4 throws
+// away everything outside a narrow band, its centre sat down in the midrange,
+// and it swept *downward*, so the hit got duller as it died. All three are
+// backwards for a clack.
+//
+//  - body    highpass, not bandpass. Passing everything above the corner keeps
+//            most of the noise energy instead of a sliver, which is where the
+//            loudness and the brightness both come from. Sweeps upward as it
+//            decays, so it thins rather than dulls.
+//  - ring    a high-Q band up where a clave actually sings, so the hit still
+//            has a pitch on the pentatonic ladder.
+//  - tick    two hundredths of a second of raw noise at full level, no attack
+//            ramp at all. This is what the ear uses to place the hit in time,
+//            and it is the whole of "immediate".
+
+/** Always in the treble, and rising with pitch — never muddy at the bottom. */
+function clackRing(freq: number, brightness: number): number {
+  return Math.min(11000, 2000 + freq * 4.5 + brightness * 900);
+}
+
+function clackBody(brightness: number): number {
+  return 2400 + brightness * 3200;
+}
+
 function createNoiseVoice(env: VoiceEnvironment, root: number): PadVoice {
   const { ctx, out, noiseBuffer } = env;
-  let live: { filter: BiquadFilterNode; freq: number } | null = null;
-
-  function centre(freq: number, brightness: number): number {
-    return freq * (1.8 + brightness * 3.4);
-  }
+  let live: { body: BiquadFilterNode; ring: BiquadFilterNode; freq: number } | null = null;
 
   function spawn(time: number, params: VoiceParams, gesture: Gesture | null) {
     const freq = semitonesToFrequency(root, params.semitones);
 
-    const source = ctx.createBufferSource();
-    source.buffer = noiseBuffer;
-    source.loop = true;
+    // -- body ------------------------------------------------------------
+    const bodySource = ctx.createBufferSource();
+    bodySource.buffer = noiseBuffer;
+    bodySource.loop = true;
 
-    // Noise has no pitch of its own; a resonant bandpass gives it one, so the
-    // clack still lands on the pentatonic ladder with the other three.
-    const filter = ctx.createBiquadFilter();
-    filter.type = "bandpass";
-    filter.Q.value = 2.4;
-    const peak = centre(freq, params.brightness);
-    filter.frequency.setValueAtTime(peak, time);
-    if (gesture) rampThrough(filter.frequency, time, gesture, (p) => centre(freq, p.brightness));
-    filter.frequency.exponentialRampToValueAtTime(Math.max(120, peak * 0.45), time + 0.2);
+    const body = ctx.createBiquadFilter();
+    body.type = "highpass";
+    body.Q.value = 0.8;
+    const corner = clackBody(params.brightness);
+    body.frequency.setValueAtTime(corner, time);
+    if (gesture) rampThrough(body.frequency, time, gesture, (p) => clackBody(p.brightness));
+    body.frequency.exponentialRampToValueAtTime(Math.min(14000, corner * 1.7), time + 0.1);
 
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0, time);
-    gain.gain.linearRampToValueAtTime(0.72, time + 0.003);
-    gain.gain.exponentialRampToValueAtTime(SILENCE, time + 0.3);
+    const bodyGain = ctx.createGain();
+    bodyGain.gain.setValueAtTime(0, time);
+    bodyGain.gain.linearRampToValueAtTime(0.62, time + 0.0012);
+    // Ramping to a near-zero floor sounds like it should give an 85ms decay and
+    // does not: an exponential to 0.0001 has already fallen below hearing in a
+    // quarter of that, which is why the first attempt measured 26ms and read as
+    // a thin tick with no level. Ramping to 2% of peak and finishing with a
+    // short linear fade gives the hit a body the ear can actually register.
+    bodyGain.gain.exponentialRampToValueAtTime(0.012, time + 0.14);
+    bodyGain.gain.linearRampToValueAtTime(0, time + 0.18);
 
-    source.connect(filter);
-    filter.connect(gain);
-    gain.connect(out);
-    source.start(time);
-    source.stop(time + 0.32);
-    return { filter, freq };
+    bodySource.connect(body);
+    body.connect(bodyGain);
+    bodyGain.connect(out);
+    bodySource.start(time);
+    bodySource.stop(time + 0.2);
+
+    // -- ring ------------------------------------------------------------
+    const ringSource = ctx.createBufferSource();
+    ringSource.buffer = noiseBuffer;
+    ringSource.loop = true;
+
+    const ring = ctx.createBiquadFilter();
+    ring.type = "bandpass";
+    ring.Q.value = 8;
+    ring.frequency.setValueAtTime(clackRing(freq, params.brightness), time);
+    if (gesture) rampThrough(ring.frequency, time, gesture, (p) => clackRing(freq, p.brightness));
+
+    const ringGain = ctx.createGain();
+    ringGain.gain.setValueAtTime(0, time);
+    ringGain.gain.linearRampToValueAtTime(0.58, time + 0.001);
+    // Outlasts the body a little: the pitched part is what stops a bright hit
+    // sounding like a burst of static.
+    ringGain.gain.exponentialRampToValueAtTime(0.012, time + 0.24);
+    ringGain.gain.linearRampToValueAtTime(0, time + 0.29);
+
+    ringSource.connect(ring);
+    ring.connect(ringGain);
+    ringGain.connect(out);
+    ringSource.start(time);
+    ringSource.stop(time + 0.31);
+
+    // -- tick ------------------------------------------------------------
+    const tickSource = ctx.createBufferSource();
+    tickSource.buffer = noiseBuffer;
+
+    const tickGain = ctx.createGain();
+    // Straight in at full level: an attack ramp, even a millisecond of one,
+    // is what made the old version feel soft.
+    tickGain.gain.setValueAtTime(0.34, time);
+    tickGain.gain.exponentialRampToValueAtTime(0.01, time + 0.016);
+    tickGain.gain.linearRampToValueAtTime(0, time + 0.022);
+
+    tickSource.connect(tickGain);
+    tickGain.connect(out);
+    tickSource.start(time);
+    tickSource.stop(time + 0.03);
+
+    return { body, ring, freq };
   }
 
   return {
@@ -239,7 +307,8 @@ function createNoiseVoice(env: VoiceEnvironment, root: number): PadVoice {
     },
     moveTo(time, params) {
       if (!live) return;
-      live.filter.frequency.setTargetAtTime(centre(live.freq, params.brightness), time, 0.03);
+      live.body.frequency.setTargetAtTime(clackBody(params.brightness), time, 0.02);
+      live.ring.frequency.setTargetAtTime(clackRing(live.freq, params.brightness), time, 0.02);
     },
     release() {
       live = null;

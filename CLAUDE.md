@@ -58,6 +58,24 @@ file is the work.
   same audio time as the note. Directly-pressed pads skip the queue — nothing
   was scheduled, so they are already in sync.
 
+- **Measure the sound, do not guess at it** — `pnpm dev`, then `pnpm measure`.
+  It renders every voice through an `OfflineAudioContext` in headless Chrome and
+  prints peak, rms, brightness, attack and decay. "The clack is too quiet" cost
+  two rounds of guessing and took one measurement to find: a bandpass with a Q
+  of 2.4 was discarding most of the noise energy, so a gain of `0.72` reached
+  the ear as a peak of `0.17`. **Raising the gain cannot fix a filter that is
+  throwing the signal away.**
+- **A bandpass is a quiet filter; a highpass is a loud one.** For anything that
+  needs to be bright *and* present, highpass the noise and let a separate
+  high-Q band supply the pitch. A narrow band alone is always dull and quiet.
+- **`exponentialRampToValueAtTime(0.0001, t + 0.085)` is not an 85ms decay.**
+  It falls below hearing in roughly a quarter of that — the first clack measured
+  26ms and read as a thin tick. Ramp to about 2% of peak over the length you
+  actually want, then finish with a short linear fade to zero.
+- **The master limiter is shared, so one loud pad ducks the others.** Keep it a
+  safety net (gentle ratio, short release) rather than a compressor; an
+  aggressive one flattens the transients the pads are made of.
+
 ## Checks and tooling gotchas
 
 - **Import paths are extensionless.** `allowImportingTsExtensions` is off, so

@@ -25,14 +25,18 @@ function createRig(): AudioRig {
   const ctx = new AudioContext();
 
   // Overdubbing stacks layers, and four pads can be held at once, so the sum
-  // can easily clip. A soft limiter on the way out costs one node and keeps a
-  // busy loop sounding thick instead of crunchy.
+  // can clip. This is a safety net and nothing more: the first settings were
+  // aggressive enough to be a compressor, which flattened exactly the
+  // percussive transients the pads are made of, and its long release let one
+  // hard hit audibly duck the bell's tail. A slower attack lets a transient
+  // punch through before the gain reduction arrives, which is how a hit keeps
+  // its impact.
   const limiter = ctx.createDynamicsCompressor();
-  limiter.threshold.value = -8;
-  limiter.knee.value = 6;
-  limiter.ratio.value = 12;
-  limiter.attack.value = 0.003;
-  limiter.release.value = 0.25;
+  limiter.threshold.value = -4;
+  limiter.knee.value = 4;
+  limiter.ratio.value = 8;
+  limiter.attack.value = 0.005;
+  limiter.release.value = 0.1;
   limiter.connect(ctx.destination);
 
   const padBus = ctx.createGain();
