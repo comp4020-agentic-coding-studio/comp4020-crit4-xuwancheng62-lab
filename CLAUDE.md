@@ -141,3 +141,15 @@ Two things worth knowing before trusting a result from it:
   initialized (all four pads present, the loop button reads "Record")
   and re-navigates if it hasn't, rather than reporting a rebuild race as a
   regression.
+- **This tool spawns a real browser with a real speaker, and it leaked one.**
+  A run that threw before reaching the cleanup at the bottom of the script
+  left Chrome running — with a live `AudioContext`, since the checks press
+  pads — for over half an hour, audibly, before anyone noticed. Three fixes,
+  in order of how much each actually protects you: `--mute-audio` at launch
+  (so even a crash or a `kill -9` can never be heard, which is the only
+  guarantee that doesn't depend on other code running correctly), a
+  `try/finally` around the run so cleanup fires on a thrown error too, and
+  `SIGINT`/`SIGTERM` handlers so a Ctrl+C doesn't orphan the child process.
+  If a headless-browser script here ever runs quietly wrong, check
+  `pgrep -fl playtest-` (or `ps aux | grep -i chrome`) before assuming
+  nothing is running.

@@ -79,6 +79,14 @@ const chrome = spawn(chromePath, [
   // autoplay policy looks for; without this flag ctx.resume() would hang
   // suspended and every voice would render silently rather than throw.
   "--autoplay-policy=no-user-gesture-required",
+  // This tool only ever reads DOM state and console/exception events — it has
+  // no business making sound. A live instance escaped this exact protection's
+  // absence once already: a run that threw before reaching cleanup left a real
+  // AudioContext looping the beat through the machine's actual speakers for
+  // over half an hour. Muting at launch means even a hard crash, a `kill -9`,
+  // or a bug in the cleanup below can never produce audible output — this is
+  // the one guarantee that doesn't depend on any other code path running.
+  "--mute-audio",
   `--remote-debugging-port=${PORT}`,
   `--user-data-dir=/tmp/playtest-${process.pid}`,
   "about:blank",
@@ -86,6 +94,33 @@ const chrome = spawn(chromePath, [
 chrome.on("error", (error) => {
   console.error("Could not start Chrome:", error.message);
   process.exit(1);
+});
+
+let cleanedUp = false;
+function cleanUp() {
+  if (cleanedUp) return;
+  cleanedUp = true;
+  try {
+    ws?.close();
+  } catch {
+    // already closed
+  }
+  chrome.kill();
+}
+// A run that throws (a bad URL, a page that never initializes, a genuine
+// assertion failure) must still kill Chrome — this is exactly the bug that
+// left one running: `runAt()` threw, nothing after it in a plain top-to-bottom
+// script ever ran, and the browser (with a live audio pipeline) outlived the
+// process that spawned it. And a Ctrl+C or an external timeout sends SIGINT/
+// SIGTERM to this process, not to Chrome's — without a handler, Node exits
+// and the browser is orphaned exactly the same way.
+process.on("SIGINT", () => {
+  cleanUp();
+  process.exit(130);
+});
+process.on("SIGTERM", () => {
+  cleanUp();
+  process.exit(143);
 });
 
 async function waitForCdp() {
@@ -437,28 +472,36 @@ const VIEWPORTS = [
 ];
 
 let anyFailed = false;
-for (const viewport of VIEWPORTS) {
-  console.log(`\n${viewport.label}`);
-  console.log("-".repeat(viewport.label.length));
-  const results = await runAt(viewport);
-  for (const result of results) {
-    console.log(`  ${result.ok ? "✓" : "✗"} ${result.name}`);
-    if (!result.ok) {
-      console.log(`      ${result.detail}`);
-      anyFailed = true;
+try {
+  for (const viewport of VIEWPORTS) {
+    console.log(`\n${viewport.label}`);
+    console.log("-".repeat(viewport.label.length));
+    const results = await runAt(viewport);
+    for (const result of results) {
+      console.log(`  ${result.ok ? "✓" : "✗"} ${result.name}`);
+      if (!result.ok) {
+        console.log(`      ${result.detail}`);
+        anyFailed = true;
+      }
     }
   }
-}
 
-if (consoleErrors.length > 0 || pageErrors.length > 0) {
+  if (consoleErrors.length > 0 || pageErrors.length > 0) {
+    anyFailed = true;
+    console.log("\nuncaught, outside the checks above:");
+    for (const error of [...pageErrors, ...consoleErrors]) console.log(`  ✗ ${error}`);
+  }
+
+  console.log("");
+  console.log(anyFailed ? "playtest: FAILED" : "playtest: all checks passed, no uncaught errors");
+} catch (error) {
+  console.error("\nplaytest crashed before finishing:", error.message ?? error);
   anyFailed = true;
-  console.log("\nuncaught, outside the checks above:");
-  for (const error of [...pageErrors, ...consoleErrors]) console.log(`  ✗ ${error}`);
+} finally {
+  // Runs whether the block above finished, failed a check, or threw --
+  // that unconditional cleanup is the actual fix. --mute-audio (above) is
+  // the backstop for when even this doesn't run.
+  cleanUp();
 }
 
-console.log("");
-console.log(anyFailed ? "playtest: FAILED" : "playtest: all checks passed, no uncaught errors");
-
-ws.close();
-chrome.kill();
 process.exit(anyFailed ? 1 : 0);
