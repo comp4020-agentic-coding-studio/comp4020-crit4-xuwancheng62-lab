@@ -2,14 +2,11 @@
 
 ## What I built
 
-**Four Pads** — four voices that differ by construction, not by retuning one
-oscillator: a swept-sine drum with a noise beater, an FM bell on an inharmonic
-ratio, a band of filtered noise, and a detuned sawtooth that sustains and
-glides. Each pad carries a drawing of its instrument. Where you touch a pad sets
-its pitch, so a tap is already expressive, and the percussive three snap to a
-pentatonic ladder, which has no semitone pairs — so someone who reads no music
-cannot land out of tune. Under it, a background pulse and a record/overdub/clear
-loop snapped to its beat grid.
+**Four Pads** — four voices built differently, not one oscillator retuned: a
+swept-sine drum, an FM bell, a band of filtered noise, and a sustaining sawtooth
+that glides. Touch position sets pitch, and the percussive three snap to a
+pentatonic ladder — no semitone pairs, so nothing can clash. A background pulse
+and a record/overdub/clear loop sit underneath, snapped to its beat grid.
 
 ## The moments that mattered
 
@@ -22,15 +19,19 @@ loop snapped to its beat grid.
    ([`6783b76`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit4-xuwancheng62-lab/commit/6783b76)).
    A check I have never seen fail is not a check.
 
-2. **Then "too quiet" showed gain was the wrong knob.** I had already raised the
-   clack's gain. Rendering the real voices through an `OfflineAudioContext`
-   found why: a bandpass with a Q of 2.4 discarded most of the noise energy, so
-   a gain of `0.72` reached the ear as a peak of `0.17`.
-   Rebuilt as a wide band with a bounded top, its level rose ninefold
-   ([`1566476...d9ef629`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit4-xuwancheng62-lab/compare/1566476...d9ef629)).
-   I kept the instrument as `pnpm measure`, and it repaid that at once —
-   catching the clack clipping and fizzing only at the *top* of the pad, where I
-   hadn't looked.
+2. **The checker was wrong before the app was.** `pnpm playtest` drives a real
+   browser instead of judging screenshots, but its first drag/multi-touch
+   checks failed on correct code: a JS-constructed `PointerEvent` never
+   registers as an active pointer, so real `setPointerCapture` throws for it.
+   Fixed to drive CDP's real input, then broke the drag handler on purpose to
+   test the fix — the two-point version passed anyway, fooled by a constant
+   that merely beat the pad's low starting value. A three-point check caught
+   it ([`3409665`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit4-xuwancheng62-lab/commit/3409665)).
+   Then a crashed run left Chrome's real audio looping the beat through actual
+   speakers for half an hour, caught only by someone's earbuds still playing
+   it. `--mute-audio` is now the guarantee that needs no other code to run
+   correctly
+   ([`3e7010b`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit4-xuwancheng62-lab/commit/3e7010b)).
 
 Full arc:
-[`0c5cba6...d9ef629`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit4-xuwancheng62-lab/compare/0c5cba6...d9ef629).
+[`0c5cba6...3e7010b`](https://github.com/comp4020-agentic-coding-studio/comp4020-crit4-xuwancheng62-lab/compare/0c5cba6...3e7010b).
