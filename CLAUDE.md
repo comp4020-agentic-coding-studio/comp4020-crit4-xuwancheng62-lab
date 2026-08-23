@@ -107,3 +107,37 @@ file is the work.
   DevTools at the iPhone preset and look.
 - **A decorative element sized in `vw` can widen the page.** `overflow-x: clip`
   on `body` is the guard; the glow needed it at the phone viewport.
+
+## `pnpm playtest` — a decidable interaction check, not a screenshot
+
+Runs a real browser through pressing every pad, dragging the glide pad,
+holding two pads with two fingers, and a full record/overdub/clear loop
+cycle, at both marking viewports — then reports pass/fail. `pnpm dev`, then
+`pnpm playtest`. Exists to replace "take a screenshot and look at it" with
+"ask the page a yes/no question" wherever the question actually has a
+yes/no answer — layout overflow, an uncaught exception mid-loop, a control
+under 44px, one finger's release cutting off another's note.
+
+Two things worth knowing before trusting a result from it:
+
+- **Drive real input, not `element.dispatchEvent(new PointerEvent(...))`.**
+  The first version failed on every run, on correct code — a JS-constructed
+  PointerEvent never registers as an "active pointer" in Chrome's real
+  input bookkeeping, so `setPointerCapture()` throws `NotFoundError` for it
+  even on a bare `<button>` with no app code involved. Only CDP's `Input`
+  domain (`dispatchMouseEvent`/`dispatchTouchEvent`), which goes through the
+  actual input pipeline, produces a pointer that capture can find.
+- **Sample three points along a drag, not two.** A check that only compares
+  the end against the start can pass on a drag that reports one fixed value
+  partway up and then never moves again — the constant still beats the
+  pad's genuinely low starting point. Three points, strictly increasing, is
+  what actually proves the drag is tracking the finger rather than reacting
+  once. Caught by deliberately breaking the drag handler and watching the
+  two-point version pass anyway.
+- **It races the dev server if run right after an edit.** Editing the very
+  file under test and running `playtest` immediately can catch Vite
+  mid-rebuild — the page loads before the rebuild finishes, and everything
+  looks broken at once. `loadPage()` now waits for a sign the app actually
+  initialized (all four pads present, the loop button reads "Record")
+  and re-navigates if it hasn't, rather than reporting a rebuild race as a
+  regression.

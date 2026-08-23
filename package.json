@@ -11,6 +11,7 @@
     "check": "pnpm typecheck && pnpm build && oxlint --ignore-path .gitignore && stylelint \"**/*.css\" --ignore-path .gitignore --allow-empty-input && vitest run",
     "check:evidence": "node scripts/check-evidence.ts",
     "measure": "node scripts/measure-voices.mjs",
+    "playtest": "node scripts/playtest.mjs",
     "test": "vitest run"
   },
   "devDependencies": {
